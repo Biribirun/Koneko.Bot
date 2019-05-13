@@ -13,7 +13,6 @@ namespace Koneko.Bot
 {
     class Program
     {
-        readonly DataSource ds = new DataSource();
         public static IEnumerable<CommandInfo> Commands => _commands.Commands;
 
         private IServiceProvider services;
@@ -68,7 +67,7 @@ namespace Koneko.Bot
 
         private async Task _commands_Log(LogMessage arg)
         {
-            System.Console.WriteLine(arg);
+            Console.WriteLine(arg);
             await Task.CompletedTask;
         }
 
@@ -92,9 +91,15 @@ namespace Koneko.Bot
             // Create a number to track where the prefix ends and the command begins
             int argPos = 0;
             // Determine if the message is a command, based on if it starts with '!' or a mention prefix
-            if (!((messageParam as SocketUserMessage).HasCharPrefix('!', ref argPos) || (messageParam as SocketUserMessage).HasMentionPrefix(client.CurrentUser, ref argPos))) return;
             // Create a Command Context
             var context = new CommandContext(client, messageParam as SocketUserMessage);
+
+            if (!((messageParam as SocketUserMessage).HasCharPrefix('!', ref argPos) || (messageParam as SocketUserMessage).HasMentionPrefix(client.CurrentUser, ref argPos)))
+            {
+                Statistics.Statistics.AddPoints(context);
+                return;
+            }
+
             // Execute the command. (result does not indicate a return value, 
             // rather an object stating if the command executed successfully)
             var result = await _commands.ExecuteAsync(context, argPos, services);
