@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 
 namespace Koneko.Bot
 {
-    public class Rootobject
-    {
-        public string Url { get; set; }
-    }
-
     class NekosDs
     {
+        class Rootobject
+        {
+            public string Url { get; set; }
+        }
+
         HttpClient http = new HttpClient();
         private readonly string API = "https://nekos.life/api/v2/img/";
 

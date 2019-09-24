@@ -17,7 +17,7 @@ namespace Koneko.Bot.Administration
 
         }
 
-        [Command("AddRewardRole"), Summary("Dodaje rangę do listy nagród.")]
+        [Command("SetRewardRole"), Summary("Dodaje rangę do listy nagród.")]
         public async Task SetRewardRole(string roleName, ulong reqScore)
         {
             IRole role = Context.Guild.Roles.FirstOrDefault(x => x.Name == roleName);
@@ -28,7 +28,7 @@ namespace Koneko.Bot.Administration
 
             if (role is null)
             {
-                await ReplyImage(description: "Nie udało się dodać roli");
+                await ReplyImage("Nie udało się dodać roli");
                 return;
             }
 
@@ -44,20 +44,20 @@ namespace Koneko.Bot.Administration
                     AdddedBy = Context.User.Id
                 };
                 _db.Repository.Insert(rankReward);
-                await ReplyImage(description: $"Do listy nagórd dodano rangę {role} za {reqScore} punktów");
+                await ReplyImage($"Do listy nagórd dodano rangę {role} za {reqScore} punktów");
             }
             else
             {
                 if (reqScore == 0)
                 {
                     _db.Repository.Delete<Db.RankReward>(x => x.Id == rewardRole.Id);
-                    await ReplyImage(description: $"Usunięto z listy nagród rangę {role.Name}.");
+                    await ReplyImage($"Usunięto z listy nagród rangę {role.Name}.");
                 }
                 else
                 {
                     rewardRole.ReqScore = reqScore;
                     _db.Repository.Update(rewardRole);
-                    await ReplyImage(description: $"Rola {role} kosztuje teraz {reqScore} punktów");
+                    await ReplyImage($"Rola {role} kosztuje teraz {reqScore} punktów");
                 }
             }
         }
@@ -75,20 +75,26 @@ namespace Koneko.Bot.Administration
                 sb.Append($"{role.Name} - {reward.ReqScore}\n");
             }
 
-            await ReplyImage(description: sb.ToString());
+            await ReplyImage(sb.ToString());
         }
 
         [Command("AddAdvanceImage"), Summary("Dodaje do wyświetlenia po awansowaniu na kolejny poziom.")]
         public async Task AddAdvanceImage()
         {
-            var url = Context.Message.Attachments.First().Url;
+            var url = Context.Message.Attachments.FirstOrDefault()?.Url;
+            if(url is null)
+            {
+                await ReplyImage("Brak załączonego obrazka");
+                return;
+            }
+
             _db.Repository.Insert(new AdvanceImage
             {
                 GuildId = Context.Guild.Id,
                 Url = url,
             });
 
-            await ReplyImage(description: "Dodano", url: url);
+            await ReplyImage($"Dodano {url}");
         }
 
         [Command("GetAdvanceImages")]
@@ -98,7 +104,7 @@ namespace Koneko.Bot.Administration
 
             foreach(var i in images)
             {
-                await ReplyImage(description: $"{i.Id}", url: i.Url);
+                await ReplyImage($"{i.Id}", url: i.Url);
             }
         }
 

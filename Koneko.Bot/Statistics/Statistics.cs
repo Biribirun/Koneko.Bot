@@ -44,12 +44,13 @@ namespace Koneko.Bot
             }
             else
             {
-                if ((DateTime.Now - statistics.LastScoredMessage).Minutes > 2)
+                if ((DateTime.Now - statistics.LastScoredMessage).Minutes < 2)
                 {
-                    statistics.Score += Points;
-                    statistics.LastScoredMessage = DateTime.Now;
-                    _db.Repository.Update(statistics);
+                    return;
                 }
+                statistics.Score += Points;
+                statistics.LastScoredMessage = DateTime.Now;
+                _db.Repository.Update(statistics);
             }
 
             var user = (context.User as SocketGuildUser);
@@ -61,6 +62,11 @@ namespace Koneko.Bot
                 join userRole in context.Guild.Roles on reward.RoleId equals userRole.Id
                 orderby reward.ReqScore
                 select userRole).ToArray();
+
+            if(userRoles.Length <= 0)
+            {
+                return;
+            }
 
             IEnumerable<IRole> rolesToRemove = userRoles[0..^1];
             var roleToAdd = userRoles[^1];
@@ -76,7 +82,7 @@ namespace Koneko.Bot
                 var embed = new EmbedBuilder
                 {
                     Description = $"{Formatters.GetUserName(user)} awansuje na {roleToAdd.Name}",
-                    ImageUrl = image.Url
+                    ImageUrl = image?.Url
                 };
                 context.Channel.SendMessageAsync(embed: embed.Build());
             }
