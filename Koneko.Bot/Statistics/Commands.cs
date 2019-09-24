@@ -6,44 +6,63 @@ using System.Linq;
 using LiteDB;
 using System.Threading.Tasks;
 using Koneko.Bot.ModuleBaseExtension;
+using Koneko.Bot.Helpers;
+using Koneko.Bot.Db;
 
-namespace Koneko.Bot.Statistics
+namespace Koneko.Bot
 {
     public class Commands : ModuleBaseEx
     {
+        public Commands(DbConnection db) : base(db)
+        {
+
+        }
+
         [Command("top"), Summary("Wyświetla listę rankingową.")]
         public async Task Top(int page = 1)
         {
             page--;
-            using (var db = new LiteDB.LiteRepository("Koneko.db"))
-            {
-                var users = db.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id)
+            var guildUsers = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id)
                                                         .ToEnumerable()
-                                                        .OrderByDescending(x => x.Score)
-                                                        .Skip(10 * page)
-                                                        .Take(10);
+                                                        .OrderByDescending(x => x.Score);
 
-                var totalUsers = db.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id).Count();
+            var currentUserPoints = guildUsers.Where(x => x.UserId == Context.User.Id).FirstOrDefault()?.Score;
 
-                var guildMembers = await Context.Guild.GetUsersAsync();
+            var pagedUsers = guildUsers.Skip(10 * page).Take(10);
 
-                var lines = from sUser in users
-                            join gUser in guildMembers on sUser.UserId equals gUser.Id
-                            select $"{gUser.Username} - {sUser.Score}";
 
-                if(lines.Count() == 0)
-                {
-                    await ReplyImage(description: $"Brak użytkowników na pozycjach {page * 10} - {page * 10 + 10}");
-                    return;
-                }
+            var totalUsers = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id).Count();
 
-                var sb = new StringBuilder();
+            var guildMembers = await Context.Guild.GetUsersAsync();
 
-                sb.Append(string.Join("\n", lines));
-                sb.Append($"\n{page * 10} - {page * 10 + 10} / {totalUsers}");
 
-                await ReplyImage(description: sb.ToString());
+            var formatFields = from sUser in pagedUsers
+                               join gUser in guildMembers on sUser.UserId equals gUser.Id into users
+                               from gUser in users.DefaultIfEmpty()
+                               select new string[2] { gUser == null ? $"Użytkownik opuścił serwer ID: {sUser.UserId}" : Formatters.GetUserName(gUser), sUser.Score.ToString() };
+
+            if(formatFields.Count() == 0)
+            {
+                await ReplyImage(description: $"Brak użytkowników na pozycjach {page * 10 + 1} - {page * 10 + 10}");
+                return;
             }
+
+            int rownum = 1;
+
+            var lines = from field in formatFields
+                            select string.Format("[{0}]", page * 10 + rownum++).PadRight(12) + "> " +
+                                $"#{field[0]}\n" +
+                                $"Całkowity wynik:".PadLeft(32) + $" {field[1]}";
+
+            var sb = new StringBuilder();
+
+            sb.Append($"Ranking użytkowników serwera {Context.Guild.Name}\n\n");
+            sb.Append(string.Join("\n", lines));
+            sb.Append('\n');
+            sb.Append(string.Concat(Enumerable.Repeat('-', 40)));
+            sb.Append($"\nTwoje miejsce w rankingu: {guildUsers.TakeWhile(x => x.UserId != Context.User.Id).Count() + 1} / {totalUsers}\n");
+            sb.Append($"Całkowity wynik: {currentUserPoints}");
+            await ReplyImage(description: $"```CS\n{sb.ToString()}```");
         }
     }
 }

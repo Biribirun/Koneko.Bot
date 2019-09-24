@@ -7,62 +7,59 @@ using System.Linq;
 using Discord.WebSocket;
 using System;
 using Koneko.Bot.ModuleBaseExtension;
+using Koneko.Bot.Db;
 
 namespace Koneko.Bot.Misc
 {
     public class Commands : ModuleBaseEx
     {
         private NekosDs _nekosds = new NekosDs();
-
-        [Command("pyrkonowiec"), Summary("Daje rangę pyrkonowiec")]
-        public async Task Pyrkonowiec()
+        private readonly CommandService _commands;
+        
+        public Commands(DbConnection dbConnection, CommandService commands) : base(dbConnection)
         {
-            var user = Context.User;
-            var role = Context.Guild.Roles.Where(i => i.Name.ToLower().Equals("pyrkonowiec")).FirstOrDefault();
-
-            await (user as SocketGuildUser).AddRoleAsync(role);
-            await ReplyImage(description: $"{user.Username} JEDZIE NA PYRKON");
+            _commands = commands;
         }
 
         [Command("baka"), Summary("Nazywa kogoś głupcem.")]
         public async Task Baka([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetBaka(), $"{Context.User.Mention} twierdzi że {user.Mention} jest gupi.");
+            await ReplyImage($"{Context.User.Mention} twierdzi że {user.Mention} jest gupi.", await _nekosds.GetBaka());
 
         [Command("poke"), Summary("Zaczepia użytkownika.")]
         public async Task Poke([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetPoke(), $"{Context.User.Mention} zaczepia {user.Mention}.");
+            await ReplyImage($"{Context.User.Mention} zaczepia {user.Mention}.", await _nekosds.GetPoke());
 
         [Command("tickle"), Summary("Łaskocze użytkownika.")]
         public async Task Tickle([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetTickle(), $"{Context.User.Mention} łaskocze {user.Mention}.");
+            await ReplyImage($"{Context.User.Mention} łaskocze {user.Mention}.", await _nekosds.GetTickle());
 
         [Command("kiss"), Summary("Całuje użytkownika.")]
         public async Task Kiss([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetKiss(), $"{Context.User.Mention} całuje {user.Mention}. Miłość rośnie wokół nas.");
+            await ReplyImage($"{Context.User.Mention} całuje {user.Mention}. Miłość rośnie wokół nas.", await _nekosds.GetKiss());
 
         [Command("slap"), Summary("Uderza użytkownika.")]
         public async Task Slap([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetSlap(), $"{Context.User.Mention} ma dzisiaj zły dzień i uderza {user.Mention}. To było super efektywne.");
+            await ReplyImage($"{Context.User.Mention} ma dzisiaj zły dzień i uderza {user.Mention}. To było super efektywne.", await _nekosds.GetSlap());
 
         [Command("cuddle"), Summary("Mizia użytkownika.")]
         public async Task Cuddle([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetCuddle(), $"{Context.User.Mention} mizia {user.Mention}.");
+            await ReplyImage($"{Context.User.Mention} mizia {user.Mention}.", await _nekosds.GetCuddle());
 
         [Command("hug"), Summary("Przytula użytkownika.")]
         public async Task Hug([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetHug(), $"{Context.User.Mention} przytula {user.Mention}.");
+            await ReplyImage($"{Context.User.Mention} przytula {user.Mention}.", await _nekosds.GetHug());
 
         [Command("pat"), Summary("Głaska użytkownika.")]
         public async Task Pat([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetPat(), $"{Context.User.Mention} głaska po główce {user.Mention}. uwu");
+            await ReplyImage($"{Context.User.Mention} głaska po główce {user.Mention}. uwu", await _nekosds.GetPat());
 
         [Command("feed"), Summary("Karmi użytkownika.")]
         public async Task Feed([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(await _nekosds.GetFeed(), $"{Context.User.Mention} karmi {user.Mention}.");
+            await ReplyImage($"{Context.User.Mention} karmi {user.Mention}.", await _nekosds.GetFeed());
 
         [Command("avatar"), Summary("Pokazuje awatar użytkoiwnika.")]
         public async Task Avatar([Remainder, Summary("")] IUser user) =>
-            await ReplyImage(user.GetAvatarUrl(), $"{user.Mention}");
+            await ReplyImage($"{user.Mention}", user.GetAvatarUrl());
 
 
         [Command("emote"), Summary("Powiększa emotikonę.")]
@@ -72,11 +69,10 @@ namespace Koneko.Bot.Misc
             var e = GuildEmote.TryParse(emote, out Emote emo);
             if (!e)
             {
-                await ReplyAsync("Nie udało się :( komenda nie działa na domyślne emotikony.");
                 return;
             }
 
-            await ReplyImage(emo.Url, emote.Replace(":", ""));
+            await ReplyImage(emote.Replace(":", ""), emo.Url);
         }
 
         [Command("help"), Summary("Wyświetla pomoc.")]
@@ -84,7 +80,7 @@ namespace Koneko.Bot.Misc
         {
             var sb = new StringBuilder();
 
-            foreach (var command in Program.Commands)
+            foreach (var command in _commands.Commands)
             {
                 var preconditionResult = await command.CheckPreconditionsAsync(Context);
 

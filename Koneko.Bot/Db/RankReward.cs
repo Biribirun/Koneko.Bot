@@ -10,5 +10,6 @@ namespace Koneko.Bot.Db
         public UInt64 RoleId { get; set; }
         public UInt64 GuildId { get; set; }
         public UInt64 ReqScore { get; set; }
+        public UInt64 AdddedBy { get; set; }
     }
 }

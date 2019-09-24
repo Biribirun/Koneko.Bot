@@ -3,70 +3,84 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using LiteDB;
 using Discord.WebSocket;
 using System.Threading.Tasks;
 using Discord;
+using Koneko.Bot.Helpers;
+using Koneko.Bot.Db;
 
-namespace Koneko.Bot.Statistics
+namespace Koneko.Bot
 {
     public class Statistics
     {
-        private static Random _rand = new Random();
+        private DbConnection _db;
+        public Statistics(DbConnection db)
+        {
+            _db = db;
+        }
 
-        public static void AddPoints(CommandContext context)
+        private Random _rand = new Random();
+
+        public void AddPoints(CommandContext context)
         {
             if (context.User.IsBot)
                 return;
             var GuildId = context.Guild.Id;
             var UserId = context.User.Id;
             ulong Points = (ulong)_rand.Next(10, 20);
-
-            using (var db = new LiteDB.LiteRepository("Koneko.db"))
+            
+            var statistics = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == GuildId && x.UserId == UserId).FirstOrDefault();
+            if (statistics is null)
             {
-                var statistics = db.Query<Db.UserStatistic>().Where(x => x.GuildId == GuildId && x.UserId == UserId).FirstOrDefault();
-                if (statistics is null)
+                statistics = new Db.UserStatistic()
                 {
-                    statistics = new Db.UserStatistic()
-                    {
-                        UserId = UserId,
-                        GuildId = GuildId,
-                        Score = Points,
-                        LastScoredMessage = DateTime.Now
-                    };
-                    db.Insert(statistics);
-                }
-                else
+                    UserId = UserId,
+                    GuildId = GuildId,
+                    Score = Points,
+                    LastScoredMessage = DateTime.Now
+                };
+                _db.Repository.Insert(statistics);
+            }
+            else
+            {
+                if ((DateTime.Now - statistics.LastScoredMessage).Minutes > 2)
                 {
-                    if ((DateTime.Now - statistics.LastScoredMessage).Minutes > 2)
-                    {
-                        statistics.Score += Points;
-                        statistics.LastScoredMessage = DateTime.Now;
-                        db.Update(statistics);
-                    }
-                }
-
-                var user = (context.User as SocketGuildUser);
-
-                var roles = db.Query<Db.RankReward>().Where(x => x.GuildId == context.Guild.Id && statistics.Score >= x.ReqScore).ToList();
-
-                var rolesToAdd =
-                    from reward in roles
-                    join userRole in context.Guild.Roles on reward.RoleId equals userRole.Id
-                    where !user.Roles.Contains(userRole)
-                    select userRole;
-
-                user.AddRolesAsync(rolesToAdd);
-
-                foreach(var i in rolesToAdd)
-                {
-                    var embed = new EmbedBuilder
-                    {
-                        Description = $"{user.Username} staje się {i.Name}!"
-                    };
-                    context.Channel.SendMessageAsync(embed: embed.Build());
+                    statistics.Score += Points;
+                    statistics.LastScoredMessage = DateTime.Now;
+                    _db.Repository.Update(statistics);
                 }
             }
 
+            var user = (context.User as SocketGuildUser);
+
+            var roles = _db.Repository.Query<Db.RankReward>().Where(x => x.GuildId == context.Guild.Id && statistics.Score >= x.ReqScore).ToEnumerable();
+
+            var userRoles =(
+                from reward in roles
+                join userRole in context.Guild.Roles on reward.RoleId equals userRole.Id
+                orderby reward.ReqScore
+                select userRole).ToArray();
+
+            IEnumerable<IRole> rolesToRemove = userRoles[0..^1];
+            var roleToAdd = userRoles[^1];
+
+            user.RemoveRolesAsync(rolesToRemove);
+
+            if (!user.Roles.Contains(roleToAdd))
+            {
+                user.AddRoleAsync(roleToAdd);
+
+                var image = _db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == context.Guild.Id).ToEnumerable().RandomElement(new Random());
+
+                var embed = new EmbedBuilder
+                {
+                    Description = $"{Formatters.GetUserName(user)} awansuje na {roleToAdd.Name}",
+                    ImageUrl = image.Url
+                };
+                context.Channel.SendMessageAsync(embed: embed.Build());
+            }
         }
+
     }
 }

@@ -1,11 +1,10 @@
 ﻿using Discord;
 using Discord.Commands;
-using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
 using Koneko.Bot.ModuleBaseExtension;
+using Koneko.Bot.Db;
 
 namespace Koneko.Bot.Administration
 {
@@ -13,42 +12,52 @@ namespace Koneko.Bot.Administration
     [RequireOwner(Group = "Permission")]
     public class Commands : ModuleBaseEx
     {
+        public Commands(DbConnection repository) : base(repository)
+        {
+
+        }
 
         [Command("AddRewardRole"), Summary("Dodaje rangę do listy nagród.")]
-        public async Task SetRewardRole(IRole role, ulong reqScore)
+        public async Task SetRewardRole(string roleName, ulong reqScore)
         {
+            IRole role = Context.Guild.Roles.FirstOrDefault(x => x.Name == roleName);
             if(role is null)
             {
-                await ReplyImage(description: "Musisz najpierw dodać role o takiej nazwie");
+                role = await Context.Guild.CreateRoleAsync(roleName);
             }
 
-            using (var db = new LiteDB.LiteRepository("Koneko.db"))
+            if (role is null)
             {
-                var rewardRole = db.Query<Db.RankReward>().Where(x => x.GuildId == Context.Guild.Id && x.RoleId == role.Id).FirstOrDefault();
+                await ReplyImage(description: "Nie udało się dodać roli");
+                return;
+            }
 
-                if (rewardRole is null)
+            Db.RankReward rewardRole = _db.Repository.Query<Db.RankReward>().Where(x => x.GuildId == Context.Guild.Id && x.RoleId == role.Id).FirstOrDefault();
+
+            if (rewardRole is null)
+            {
+                Db.RankReward rankReward = new Db.RankReward
                 {
-                    Db.RankReward rankReward = new Db.RankReward
-                    {
-                        GuildId = Context.Guild.Id,
-                        ReqScore = reqScore,
-                        RoleId = role.Id,
-                    };
-                    db.Insert(rankReward);
+                    GuildId = Context.Guild.Id,
+                    ReqScore = reqScore,
+                    RoleId = role.Id,
+                    AdddedBy = Context.User.Id
+                };
+                _db.Repository.Insert(rankReward);
+                await ReplyImage(description: $"Do listy nagórd dodano rangę {role} za {reqScore} punktów");
+            }
+            else
+            {
+                if (reqScore == 0)
+                {
+                    _db.Repository.Delete<Db.RankReward>(x => x.Id == rewardRole.Id);
+                    await ReplyImage(description: $"Usunięto z listy nagród rangę {role.Name}.");
                 }
                 else
                 {
-                    if (rewardRole.ReqScore == 0)
-                    {
-                        db.Delete<Db.RankReward>(x => x.Id == rewardRole.Id);
-                        await ReplyImage(description: $"Usunięto z listy nagród rangę {role.Name}.");
-                    }
-                    else
-                    {
-                        rewardRole.ReqScore = reqScore;
-                        db.Update(rewardRole);
-                        await ReplyImage(description: $"Do listy nagórd dodano rangę {role} za {reqScore} punktów");
-                    }
+                    rewardRole.ReqScore = reqScore;
+                    _db.Repository.Update(rewardRole);
+                    await ReplyImage(description: $"Rola {role} kosztuje teraz {reqScore} punktów");
                 }
             }
         }
@@ -56,20 +65,57 @@ namespace Koneko.Bot.Administration
         [Command("GetRewardRoles"), Summary("Wyświetla listę nagród za punkty.")]
         public async Task GetRewardRoles()
         {
-            using (var db = new LiteDB.LiteRepository("Koneko.db"))
+            var rewards = _db.Repository.Query<Db.RankReward>().Where(x => x.GuildId == Context.Guild.Id).ToEnumerable().OrderBy(x => x.ReqScore);
+
+            StringBuilder sb = new StringBuilder();
+
+            foreach (var reward in rewards)
             {
-                var rewards = db.Query<Db.RankReward>().Where(x => x.GuildId == Context.Guild.Id).ToEnumerable();
-
-                StringBuilder sb = new StringBuilder();
-
-                foreach (var reward in rewards)
-                {
-                    var rolename = Context.Guild.Roles.Where(x => x.Id == reward.RoleId).FirstOrDefault().Name;
-                    sb.Append($"{rolename} - {reward.ReqScore}\n");
-                }
-
-                await ReplyImage(description: sb.ToString());
+                var role = Context.Guild.Roles.Where(x => x.Id == reward.RoleId).FirstOrDefault();
+                sb.Append($"{role.Name} - {reward.ReqScore}\n");
             }
+
+            await ReplyImage(description: sb.ToString());
+        }
+
+        [Command("AddAdvanceImage"), Summary("Dodaje do wyświetlenia po awansowaniu na kolejny poziom.")]
+        public async Task AddAdvanceImage()
+        {
+            var url = Context.Message.Attachments.First().Url;
+            _db.Repository.Insert(new AdvanceImage
+            {
+                GuildId = Context.Guild.Id,
+                Url = url,
+            });
+
+            await ReplyImage(description: "Dodano", url: url);
+        }
+
+        [Command("GetAdvanceImages")]
+        public async Task GetAdvanceImages()
+        {
+            var images =_db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == Context.Guild.Id).ToEnumerable();
+
+            foreach(var i in images)
+            {
+                await ReplyImage(description: $"{i.Id}", url: i.Url);
+            }
+        }
+
+        [Command("RemoveAdvanceImage")]
+        public async Task RemoveAdvanceImage(int id)
+        {
+            var img = _db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == Context.Guild.Id && x.Id == id).FirstOrDefault();
+            
+            if(img is null)
+            {
+                await ReplyImage("Na obecnej gildii brak obrazka o takim id.");
+            }
+            else
+            {
+                _db.Repository.Delete<AdvanceImage>(img.Id);
+                await ReplyImage("Pomyślnie usunięto obrazek.");
+            }            
         }
     }
 }
