@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koneko.Bot.Db;
+using Koneko.Bot.Misc;
 
 namespace Koneko.Bot
 {
@@ -19,6 +20,7 @@ namespace Koneko.Bot
                 .AddScoped<ResponseRemover>()
                 .AddScoped<ErrorHandler>()
                 .AddScoped<Statistics>()
+                .AddScoped<ISearch, BingSearch>()
                 .BuildServiceProvider();
 
             await services.GetService<BotMain>().Main(args);
