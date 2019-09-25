@@ -261,3 +261,4 @@ __pycache__/
 *.pyc
 
 Koneko.Bot/Properties/PublishProfiles/FolderProfile.pubxml
+Koneko.Bot/App.config
