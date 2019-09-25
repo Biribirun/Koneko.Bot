@@ -14,7 +14,7 @@ namespace Koneko.Bot.Helpers
             {
                 return $"Użytkownik opuścił serwer ID: {user.Id}";
             }
-            var u = (user as SocketGuildUser);
+            var u = user as SocketGuildUser;
             return string.IsNullOrEmpty(u.Nickname) ? u.Username : u.Nickname;
         }
     }

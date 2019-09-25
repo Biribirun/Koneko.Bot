@@ -21,10 +21,7 @@ namespace Koneko.Bot.Administration
         public async Task SetRewardRole(string roleName, ulong reqScore)
         {
             IRole role = Context.Guild.Roles.FirstOrDefault(x => x.Name == roleName);
-            if(role is null)
-            {
-                role = await Context.Guild.CreateRoleAsync(roleName);
-            }
+            role ??= await Context.Guild.CreateRoleAsync(roleName);
 
             if (role is null)
             {

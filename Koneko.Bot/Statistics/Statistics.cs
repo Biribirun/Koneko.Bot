@@ -77,7 +77,7 @@ namespace Koneko.Bot
             {
                 user.AddRoleAsync(roleToAdd);
 
-                var image = _db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == context.Guild.Id).ToEnumerable().RandomElement(new Random());
+                var image = _db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == context.Guild.Id).ToEnumerable().RandomElement(_rand);
 
                 var embed = new EmbedBuilder
                 {
@@ -87,6 +87,5 @@ namespace Koneko.Bot
                 context.Channel.SendMessageAsync(embed: embed.Build());
             }
         }
-
     }
 }
