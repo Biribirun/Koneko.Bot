@@ -8,17 +8,17 @@ namespace Koneko.Bot
 {
     class NekosDs
     {
-        class Rootobject
+        private class Rootobject
         {
             public string Url { get; set; }
         }
 
-        HttpClient http = new HttpClient();
-        private readonly string API = "https://nekos.life/api/v2/img/";
+        private readonly Uri API = new Uri("https://nekos.life/api/v2/img/");
 
         public async Task<string> GetImage(string type)
         {
-            var result = http.GetAsync($"{API}{type}").Result;
+            using HttpClient http = new HttpClient();
+            var result = await http.GetAsync(new Uri(API, type));
             var json = result.Content.ReadAsStringAsync().Result;
             var img = Newtonsoft.Json.JsonConvert.DeserializeObject<Rootobject>(json);
             return img.Url;

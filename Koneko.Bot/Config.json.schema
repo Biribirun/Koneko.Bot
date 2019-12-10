@@ -1,0 +1,15 @@
+{
+  "ConnectionStrings": {
+    "KonekoDB": ""
+  },
+  "UserID": "",
+  "Password": "",
+  "tokenTest": "",
+  "tokenProd": "",
+  "prod": false,
+  "playerConfiguration": {
+    "RestUri": "",
+    "WebSocketUri": "",
+    "Password": ""
+  }
+}

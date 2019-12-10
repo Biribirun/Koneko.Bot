@@ -8,39 +8,47 @@ using Discord.WebSocket;
 using System.Threading.Tasks;
 using Discord;
 using Koneko.Bot.Helpers;
-using Koneko.Bot.Db;
+using Koneko.Bot.DataAccessLayer.Repositories;
+using Koneko.Bot.Domain.Models;
 
 namespace Koneko.Bot
 {
     public class Statistics
     {
-        private DbConnection _db;
-        public Statistics(DbConnection db)
+        private readonly StatisticsRepository _statisticsRepository;
+        private readonly AdvanceImagesRepository _advanceImagesRepository;
+
+        public Statistics(StatisticsRepository statisticsRepository, AdvanceImagesRepository advanceImagesRepository)
         {
-            _db = db;
+            _statisticsRepository = statisticsRepository;
+            _advanceImagesRepository = advanceImagesRepository;
         }
 
         private Random _rand = new Random();
 
-        public void AddPoints(CommandContext context)
+        public async Task AddPoints(CommandContext context)
         {
+            if (context is null)
+                throw new ArgumentNullException(nameof(context));
+
             if (context.User.IsBot)
                 return;
+
             var GuildId = context.Guild.Id;
             var UserId = context.User.Id;
             ulong Points = (ulong)_rand.Next(10, 20);
-            
-            var statistics = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == GuildId && x.UserId == UserId).FirstOrDefault();
+
+            var statistics = await _statisticsRepository.GetUserStatistics(GuildId, UserId);
             if (statistics is null)
             {
-                statistics = new Db.UserStatistic()
+                statistics = new UserStatistic()
                 {
                     UserId = UserId,
                     GuildId = GuildId,
                     Score = Points,
                     LastScoredMessage = DateTime.Now
                 };
-                _db.Repository.Insert(statistics);
+                await _statisticsRepository.AddUserStatistic(statistics);
             }
             else
             {
@@ -49,17 +57,17 @@ namespace Koneko.Bot
                     return;
                 }
                 statistics.Score += Points;
-                statistics.LastScoredMessage = DateTime.Now;
-                _db.Repository.Update(statistics);
+                await _statisticsRepository.UpdateStatistics(statistics);
             }
 
             var user = (context.User as SocketGuildUser);
 
-            var roles = _db.Repository.Query<Db.RankReward>().Where(x => x.GuildId == context.Guild.Id && statistics.Score >= x.ReqScore).ToEnumerable();
+            var roles = await _statisticsRepository.GetRankRewards(GuildId);
 
             var userRoles =(
                 from reward in roles
                 join userRole in context.Guild.Roles on reward.RoleId equals userRole.Id
+                where reward.ReqScore <= statistics.Score
                 orderby reward.ReqScore
                 select userRole).ToArray();
 
@@ -71,20 +79,20 @@ namespace Koneko.Bot
             IEnumerable<IRole> rolesToRemove = userRoles[0..^1];
             var roleToAdd = userRoles[^1];
 
-            user.RemoveRolesAsync(rolesToRemove);
+            await user.RemoveRolesAsync(rolesToRemove);
 
             if (!user.Roles.Contains(roleToAdd))
             {
-                user.AddRoleAsync(roleToAdd);
+                await user.AddRoleAsync(roleToAdd);
 
-                var image = _db.Repository.Query<AdvanceImage>().Where(x => x.GuildId == context.Guild.Id).ToEnumerable().RandomElement(_rand);
+                var image = (await _advanceImagesRepository.GetAdvancesImage(GuildId)).RandomElement(_rand);
 
                 var embed = new EmbedBuilder
                 {
                     Description = $"{Formatters.GetUserName(user)} awansuje na {roleToAdd.Name}",
                     ImageUrl = image?.Url
                 };
-                context.Channel.SendMessageAsync(embed: embed.Build());
+                await context.Channel.SendMessageAsync(embed: embed.Build());
             }
         }
     }

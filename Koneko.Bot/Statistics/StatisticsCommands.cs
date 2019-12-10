@@ -7,31 +7,29 @@ using LiteDB;
 using System.Threading.Tasks;
 using Koneko.Bot.ModuleBaseExtension;
 using Koneko.Bot.Helpers;
-using Koneko.Bot.Db;
+using Koneko.Bot.DataAccessLayer.Repositories;
+using Discord.WebSocket;
 
 namespace Koneko.Bot
 {
-    public class Commands : ModuleBaseEx
+    public class StatisticsCommands : ModuleBaseEx
     {
-        public Commands(DbConnection db) : base(db)
+        private readonly StatisticsRepository _statisticsRepository;
+        public StatisticsCommands(MessageRemoverService responseRemover, StatisticsRepository statisticsRepository) : base(responseRemover)
         {
-
+            _statisticsRepository = statisticsRepository;
         }
 
         [Command("top"), Summary("Wyświetla listę rankingową.")]
         public async Task Top(int page = 1)
         {
             page--;
-            var guildUsers = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id)
-                                                        .ToEnumerable()
-                                                        .OrderByDescending(x => x.Score);
 
-            var currentUserPoints = guildUsers.Where(x => x.UserId == Context.User.Id).FirstOrDefault()?.Score;
+            var currentUserStatistics = await _statisticsRepository.GetUserStatistics(Context.Guild.Id, Context.User.Id);
 
-            var pagedUsers = guildUsers.Skip(10 * page).Take(10);
+            var pagedUsers = await _statisticsRepository.GetStatistics(Context.Guild.Id, page);
 
-
-            var totalUsers = _db.Repository.Query<Db.UserStatistic>().Where(x => x.GuildId == Context.Guild.Id).Count();
+            var totalUsers = (Context.Guild as SocketGuild).MemberCount;
 
             var guildMembers = await Context.Guild.GetUsersAsync();
 
@@ -41,7 +39,7 @@ namespace Koneko.Bot
                                from gUser in users.DefaultIfEmpty()
                                select new string[2] { gUser == null ? $"Użytkownik opuścił serwer ID: {sUser.UserId}" : Formatters.GetUserName(gUser), sUser.Score.ToString() };
 
-            if(formatFields.Count() == 0)
+            if(!formatFields.Any())
             {
                 await ReplyImage(description: $"Brak użytkowników na pozycjach {page * 10 + 1} - {page * 10 + 10}");
                 return;
@@ -50,7 +48,7 @@ namespace Koneko.Bot
             int rownum = 1;
 
             var lines = from field in formatFields
-                            select string.Format("[{0}]", page * 10 + rownum++).PadRight(12) + "> " +
+                            select string.Format("[{0}]", (page * 10) + rownum++).PadRight(12) + "> " +
                                 $"#{field[0]}\n" +
                                 $"Całkowity wynik:".PadLeft(32) + $" {field[1]}";
 
@@ -60,8 +58,8 @@ namespace Koneko.Bot
             sb.Append(string.Join("\n", lines));
             sb.Append('\n');
             sb.Append(string.Concat(Enumerable.Repeat('-', 40)));
-            sb.Append($"\nTwoje miejsce w rankingu: {guildUsers.TakeWhile(x => x.UserId != Context.User.Id).Count() + 1} / {totalUsers}\n");
-            sb.Append($"Całkowity wynik: {currentUserPoints}");
+            //sb.Append($"\nTwoje miejsce w rankingu: {guildUsers.TakeWhile(x => x.UserId != Context.User.Id).Count() + 1} / {totalUsers}\n");
+            sb.Append($"Całkowity wynik: {currentUserStatistics.Score}");
             await ReplyImage(description: $"```CS\n{sb.ToString()}```");
         }
     }

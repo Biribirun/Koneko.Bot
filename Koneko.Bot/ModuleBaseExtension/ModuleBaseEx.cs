@@ -5,16 +5,15 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Reflection;
-using Koneko.Bot.Db;
 
 namespace Koneko.Bot.ModuleBaseExtension
 {
     public class ModuleBaseEx : ModuleBase
     {
-        protected DbConnection _db;
-        public ModuleBaseEx(DbConnection repository)
+        private readonly MessageRemoverService _responseRemover;
+        public ModuleBaseEx(MessageRemoverService responseRemover)
         {
-            _db = repository;
+            _responseRemover = responseRemover;
         }
 
         public async Task ReplyImage(string description = null, string url = null)
@@ -27,11 +26,7 @@ namespace Koneko.Bot.ModuleBaseExtension
 
             var response = await ReplyAsync(embed: embed.Build());
 
-            _db.Repository.Insert(new Db.BotResponse
-            {
-                MessageId = Context.Message.Id,
-                ResponseId = response.Id
-            });
+            await _responseRemover.SaveBotResponse(Context, response);
         }
     }
 }

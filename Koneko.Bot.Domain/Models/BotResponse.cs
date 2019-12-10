@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 
-namespace Koneko.Bot.Db
+namespace Koneko.Bot.Domain.Models
 {
-    class BotResponse
+    public class BotResponse
     {
-        public int Id { get; set; }
+        [Key]
         public ulong ResponseId { get; set; }
+        public ulong GuildId { get; set; }
         public ulong MessageId { get; set; }
     }
 }

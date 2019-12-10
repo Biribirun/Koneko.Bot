@@ -1,27 +1,43 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Koneko.Bot.Db;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Hosting;
+
 
 namespace Koneko.Bot
 {
-    class Program
+    public class Program
     {
-        private IServiceProvider services;
-        static void Main(string[] args)
-            => new Program().MainAsync(args).GetAwaiter().GetResult();
-
-        public async Task MainAsync(string[] args)
+        static int Main(string[] args)
         {
-            services = new ServiceCollection()
-                .AddSingleton<BotMain>()
-                .AddSingleton<DbConnection>()
-                .AddScoped<ResponseRemover>()
-                .AddScoped<ErrorHandler>()
-                .AddScoped<Statistics>()
-                .BuildServiceProvider();
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile("Config.json")
+                .Build();
 
-            await services.GetService<BotMain>().Main(args);
+            var webHost = CreateWebHostBuilder(args, configuration).Build();
+
+            try
+            {
+                webHost.Run();
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                return ex.HResult;
+            }
+            finally
+            {
+
+            }
         }
+
+        public static IWebHostBuilder CreateWebHostBuilder(string[] args, IConfiguration config) =>
+            WebHost.CreateDefaultBuilder(args)
+                .UseConfiguration(config)
+                .UseStartup<Startup>();
     }
+
 }
